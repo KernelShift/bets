@@ -1,0 +1,72 @@
+<div class="grid">
+  <div class="card">
+    <h1>Main</h1>
+
+    <div class="pillrow">
+      <div class="pill">Total deposited: <strong><span id="myDep"></span></strong></div>
+      <div class="pill">My bet: <strong><span id="myBet"></span></strong></div>
+      <div class="pill">BTC/USD: <strong><span id="btcUsd"></span></strong></div>
+    </div>
+
+    <hr />
+
+    <h2>Bet</h2>
+    <p class="muted">
+      Bets are always <strong>2×</strong> your total deposited amount.
+      Click below to fund your bet in Settings.
+    </p>
+
+    <a class="btn" href="/settings#deposit">Bet now</a>
+    <p class="muted mt">Settings will show your QR code and deposit address.</p>
+  </div>
+
+  <div class="card">
+    <h2>Leaderboard (locked until you deposit)</h2>
+
+    <% if (!hasBet) { %>
+      <p class="muted">You must complete a deposit before you can see any user bets.</p>
+    <% } else { %>
+      <table>
+        <thead>
+          <tr><th>Rank</th><th>User</th><th>Team</th><th>Bet (USD)</th></tr>
+        </thead>
+        <tbody>
+          <% top3.forEach((r, i) => { %>
+            <tr>
+              <td><%= i+1 %></td>
+              <td><strong><%= r.display_name %></strong> <span class="muted">@<%= r.username %></span></td>
+              <td><%= (r.team || '').trim() ? r.team[0].toUpperCase()+r.team.slice(1) : '—' %></td>
+              <td><%= `$${(r.bet_usd_cents/100).toFixed(2)}` %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+
+      <h3 class="mt">All other bets</h3>
+      <table>
+        <thead><tr><th>User</th><th>Team</th><th>Bet (USD)</th></tr></thead>
+        <tbody>
+          <% if (others.length === 0) { %>
+            <tr><td colspan="3" class="muted">No other bets yet.</td></tr>
+          <% } %>
+          <% others.forEach((r) => { %>
+            <tr>
+              <td><%= r.display_name %> <span class="muted">@<%= r.username %></span></td>
+              <td><%= (r.team || '').trim() ? r.team[0].toUpperCase()+r.team.slice(1) : '—' %></td>
+              <td><%= `$${(r.bet_usd_cents/100).toFixed(2)}` %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+  </div>
+</div>
+
+<script>
+  function money(cents){ return `$${(Number(cents||0)/100).toFixed(2)}`; }
+
+  document.getElementById('myDep').textContent = money(<%- JSON.stringify(myDepositedUsdCents || 0) %>);
+  document.getElementById('myBet').textContent = money(<%- JSON.stringify(myBetUsdCents || 0) %>);
+  const btc = <%- JSON.stringify(btcUsd) %>;
+  document.getElementById('btcUsd').textContent = btc ? `$${Number(btc).toLocaleString()}` : '—';
+</script>
