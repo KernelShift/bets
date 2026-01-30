@@ -1,0 +1,18 @@
+<div class="card">
+  <h1>Login</h1>
+  <% if (error) { %><p class="err"><%= error %></p><% } %>
+
+  <form method="POST" action="/login">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+    <label>Username</label>
+    <input name="username" autocomplete="username" required>
+
+    <label>Password</label>
+    <input type="password" name="password" autocomplete="current-password" required>
+
+    <button type="submit">Login</button>
+  </form>
+
+  <p class="muted">No account? <a href="/register">Register</a></p>
+</div>

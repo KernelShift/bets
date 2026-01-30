@@ -1,0 +1,28 @@
+<div class="card">
+  <h1>Create account</h1>
+  <% if (error) { %><p class="err"><%= error %></p><% } %>
+
+  <form method="POST" action="/register">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+    <label>Username</label>
+    <input name="username" autocomplete="username" placeholder="logan_01" required>
+
+    <label>Display name</label>
+    <input name="display_name" autocomplete="name" placeholder="Logan" required>
+
+    <label>Password</label>
+    <input type="password" name="password" autocomplete="new-password" placeholder="10+ chars" required>
+
+    <label>Team</label>
+    <select name="team" required>
+    <option value="" selected disabled>Pick one…</option>
+    <option value="patriots">Patriots</option>
+    <option value="seahawks">Seahawks</option>
+    </select>
+
+    <button type="submit">Register</button>
+  </form>
+
+  <p class="muted">Already have an account? <a href="/login">Login</a></p>
+</div>

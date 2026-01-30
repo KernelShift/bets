@@ -1,0 +1,224 @@
+<div class="grid">
+  <div class="card">
+    <h1>Settings</h1>
+
+    <% if (error) { %><p class="err"><%= error %></p><% } %>
+    <% if (message) { %><p class="ok"><%= message %></p><% } %>
+
+    <label>Team</label>
+    <input value="<%= user.team %>" disabled>
+    <h2>Deposit / Bet funding</h2>
+    <p class="muted">
+      Total deposited: <strong id="totalCreditedUsd">$<%= (totalCreditedUsdCents/100).toFixed(2) %></strong><br/>
+      My bet: <strong id="betUsd">$<%= (betUsdCents/100).toFixed(2) %></strong><br/>
+      BTC/USD: <strong id="btcUsd">…</strong>
+    </p>
+
+    <div id="depositPanel" class="deposit">
+      <h3>Your deposit address</h3>
+      <code class="codeblock"><%= user.wallet_address %></code>
+
+      <div style="margin-top:12px;">
+        <img src="<%= qrDataUrl %>" alt="Deposit QR" class="qr" />
+      </div>
+
+      <hr style="margin:16px 0;" />
+
+      <h3>Start a deposit (USD)</h3>
+      <p class="muted">
+        The USD amount you enter is locked when you create the deposit, so it won’t change with BTC price.
+      </p>
+
+      <div class="betbox">
+        <input id="usd" inputmode="decimal" placeholder="Amount (USD), e.g. 20">
+        <button id="startDeposit">Create deposit</button>
+      </div>
+
+      <div id="startMsg" class="deposit hidden"></div>
+
+      <% if (depositId) { %>
+        <hr style="margin:16px 0;" />
+        <p class="muted">Loading deposit <strong>#<%= depositId %></strong>…</p>
+      <% } %>
+    </div>
+
+    <hr />
+
+    <h2>Profile</h2>
+    <form method="POST" action="/settings/profile">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label>Username</label>
+      <input value="<%= user.username %>" disabled>
+
+      <label>Display name</label>
+      <input name="display_name" value="<%= user.display_name %>" required>
+
+      <button type="submit">Save</button>
+    </form>
+
+    <hr />
+
+    <h2>Wallet</h2>
+    <p class="muted">Assigned deposit address:</p>
+    <code class="codeblock"><%= user.wallet_address %></code>
+  </div>
+
+  <div class="card">
+    <h2>Password</h2>
+    <form method="POST" action="/settings/password">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+      <label>Current password</label>
+      <input type="password" name="current_password" autocomplete="current-password" required>
+
+      <label>New password</label>
+      <input type="password" name="new_password" autocomplete="new-password" required>
+
+      <button type="submit">Update password</button>
+    </form>
+
+    <hr />
+
+    <h2>Two-factor authentication (TOTP)</h2>
+    <% if (!user.twofa_enabled) { %>
+      <p class="muted">2FA is currently off.</p>
+      <a class="btn" href="/settings/2fa/setup">Enable 2FA</a>
+    <% } else { %>
+      <p class="muted">2FA is currently on.</p>
+      <form method="POST" action="/settings/2fa/disable">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <label>Enter 2FA code to disable</label>
+        <input name="token" inputmode="numeric" placeholder="123456" required>
+        <button type="submit">Disable 2FA</button>
+      </form>
+    <% } %>
+  </div>
+</div>
+
+<script>
+  let depositId = <%- depositId ? JSON.stringify(depositId) : "null" %>;
+  const csrfToken = "<%= csrfToken %>";
+
+  const usdInput = document.getElementById('usd');
+  const btn = document.getElementById('startDeposit');
+  const msg = document.getElementById('startMsg');
+
+  function showMsg(html) {
+    msg.classList.remove('hidden');
+    msg.innerHTML = html;
+  }
+
+  function money(usdCents) {
+    return `$${(usdCents/100).toFixed(2)}`;
+  }
+
+  async function refreshRate() {
+    try {
+      const r = await fetch('/api/rate');
+      const j = await r.json();
+      if (!j.ok) return;
+      document.getElementById('btcUsd').textContent =
+        j.btcUsd ? `$${Number(j.btcUsd).toLocaleString(undefined, { maximumFractionDigits: 2 })}` : 'N/A';
+    } catch {}
+  }
+
+  refreshRate();
+  setInterval(refreshRate, 60_000);
+
+  btn.addEventListener('click', async () => {
+    const usd = usdInput.value.trim();
+    const res = await fetch('/bet/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'CSRF-Token': csrfToken },
+      body: JSON.stringify({ usd })
+    });
+    const data = await res.json();
+    if (!data.ok) return showMsg(`<p class="err">${data.error}</p>`);
+    showMsg(`<p class="ok">Deposit created. Redirecting…</p>`);
+    setTimeout(() => location.href = data.redirect, 250);
+  });
+
+  async function resolveDepositId() {
+  if (depositId) return depositId;
+
+  // If no depositId in URL, look for the latest pending deposit
+  try {
+    const r = await fetch('/api/deposits/latest-pending');
+    const j = await r.json();
+    if (j.ok && j.deposit && j.deposit.id) {
+      depositId = String(j.deposit.id);
+      return depositId;
+    }
+  } catch {}
+
+  return null;
+}
+
+async function loadDeposit() {
+  const did = await resolveDepositId();
+  if (!did) return; // nothing pending
+
+  // Load deposit details
+  const res = await fetch(`/api/deposit/${did}`);
+  const data = await res.json();
+  if (!data.ok) {
+    showMsg(`<p class="err">${data.error}</p>`);
+    return;
+  }
+
+  const d = data.deposit;
+
+  showMsg(`
+    <h3>Pending deposit #${d.id}</h3>
+    <div class="pillrow">
+      <div class="pill">USD locked: <strong>${money(d.usd_cents)}</strong></div>
+      <div class="pill">Status: <strong id="depStatus">${d.status}</strong></div>
+    </div>
+
+    <p class="muted" style="margin-top:12px;">
+      Waiting for an on-chain payment. Auto-checking every 15 seconds.
+    </p>
+
+    <button id="checkNow">Check now</button>
+    <div id="checkInfo" class="muted" style="margin-top:10px;"></div>
+  `);
+
+  const checkBtn = document.getElementById('checkNow');
+  const info = document.getElementById('checkInfo');
+
+  async function checkOnce() {
+    try {
+      const r2 = await fetch(`/api/deposit/${did}/check`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'CSRF-Token': csrfToken },
+        body: JSON.stringify({})
+      });
+      const j2 = await r2.json();
+      if (!j2.ok) {
+        info.textContent = 'Check failed. Try again.';
+        return;
+      }
+
+      if (j2.credited) {
+        document.getElementById('depStatus').textContent = 'credited';
+        info.innerHTML = `<span class="ok">Deposit credited! Redirecting to Main…</span>`;
+        setTimeout(() => location.href = '/main', 500);
+        return;
+      }
+
+      // USD-only message (no sats shown)
+      info.textContent = 'Not received yet (confirmed). Keep this page open.';
+    } catch {
+      info.textContent = 'Check failed. Try again.';
+    }
+  }
+
+  checkBtn.addEventListener('click', checkOnce);
+
+  checkOnce();
+  setInterval(checkOnce, 15_000);
+}
+
+loadDeposit();
+  
+</script>

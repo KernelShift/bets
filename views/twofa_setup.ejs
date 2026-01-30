@@ -1,0 +1,34 @@
+<div class="card">
+  <% if (mode === 'setup') { %>
+    <h1>Set up 2FA</h1>
+    <p class="muted">Scan the QR code in Google Authenticator / Authy, then enter the 6-digit code.</p>
+
+    <% if (error) { %><p class="err"><%= error %></p><% } %>
+
+    <% if (qrDataUrl) { %>
+      <img src="<%= qrDataUrl %>" alt="2FA QR" class="qr" />
+    <% } else { %>
+      <p class="muted">(QR not shown again; restart setup if needed.)</p>
+    <% } %>
+
+    <p class="muted">Secret (backup): <code><%= secret %></code></p>
+
+    <form method="POST" action="/settings/2fa/confirm">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label>6-digit code</label>
+      <input name="token" inputmode="numeric" placeholder="123456" required>
+      <button type="submit">Enable 2FA</button>
+    </form>
+
+  <% } else { %>
+    <h1>2FA required</h1>
+    <% if (error) { %><p class="err"><%= error %></p><% } %>
+
+    <form method="POST" action="/login-2fa">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label>6-digit code</label>
+      <input name="token" inputmode="numeric" placeholder="123456" required>
+      <button type="submit">Verify</button>
+    </form>
+  <% } %>
+</div>

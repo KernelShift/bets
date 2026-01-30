@@ -1,0 +1,77 @@
+:root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+body { margin: 0; background: #0b0f14; color: #e7eef7; }
+a { color: #9bd1ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border-bottom: 1px solid #1c2633; background: #0f151d;
+}
+.brand { font-weight: 700; letter-spacing: 0.5px; }
+.nav { display: flex; gap: 14px; align-items: center; }
+.inline { display: inline; }
+.linkbtn { background: none; border: none; color: #9bd1ff; cursor: pointer; padding: 0; font: inherit; }
+
+.container { max-width: 1100px; margin: 0 auto; padding: 18px; }
+
+.grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
+@media (min-width: 900px) { .grid { grid-template-columns: 1.15fr 0.85fr; } }
+
+.card {
+  background: #0f151d;
+  border: 1px solid #1c2633;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.3);
+}
+
+h1 { margin: 0 0 10px; font-size: 22px; }
+h2 { margin: 12px 0 8px; font-size: 18px; }
+h3 { margin: 12px 0 8px; font-size: 16px; }
+.mt { margin-top: 14px; }
+
+label { display: block; margin-top: 10px; margin-bottom: 6px; color: #b7c6d8; }
+input {
+  width: 100%;
+  background: #0b1118;
+  border: 1px solid #223044;
+  color: #e7eef7;
+  padding: 10px 10px;
+  border-radius: 10px;
+  outline: none;
+}
+input:focus { border-color: #4aa8ff; }
+
+button, .btn {
+  margin-top: 12px;
+  background: #1f6feb;
+  border: 0;
+  color: white;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: inline-block;
+}
+button:hover, .btn:hover { filter: brightness(1.06); }
+
+hr { border: 0; border-top: 1px solid #1c2633; margin: 14px 0; }
+
+.err { color: #ff8f8f; }
+.ok { color: #9bffb1; }
+.muted { color: #9fb2c7; }
+
+table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+th, td { border-bottom: 1px solid #1c2633; padding: 10px 8px; text-align: left; }
+th { color: #b7c6d8; font-weight: 600; }
+
+.pillrow { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
+.pill { border: 1px solid #223044; padding: 8px 10px; border-radius: 999px; background: #0b1118; }
+
+.betbox { display: flex; gap: 10px; align-items: center; }
+.betbox input { flex: 1; }
+.deposit { margin-top: 12px; border: 1px dashed #223044; padding: 12px; border-radius: 12px; background: #0b1118; }
+.hidden { display: none; }
+
+.codeblock { display: block; padding: 10px; border-radius: 10px; background: #0b1118; border: 1px solid #223044; overflow-x: auto; }
+
+.qr { width: 220px; height: 220px; image-rendering: pixelated; border-radius: 10px; border: 1px solid #223044; background: #fff; }
