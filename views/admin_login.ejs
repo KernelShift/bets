@@ -1,0 +1,10 @@
+<div class="card">
+  <h2>Admin Login</h2>
+  <% if (error) { %><p class="error"><%= error %></p><% } %>
+  <form method="post" action="/admin/login">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label>Admin Code</label>
+    <input type="password" name="code" autocomplete="off" required>
+    <button type="submit">Enter</button>
+  </form>
+</div>

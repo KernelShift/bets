@@ -1,0 +1,111 @@
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+    <h2>Admin Panel</h2>
+    <form method="post" action="/admin/logout">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button type="submit">Exit Admin</button>
+    </form>
+  </div>
+
+  <p id="overview">Loading…</p>
+
+  <hr>
+
+  <h3>Users</h3>
+  <pre id="users" style="white-space:pre-wrap;"></pre>
+
+  <h3>Deposits (latest 200)</h3>
+  <pre id="deposits" style="white-space:pre-wrap;"></pre>
+
+  <hr>
+
+  <h3>Actions</h3>
+
+  <div style="display:grid;gap:10px;max-width:520px;">
+    <div class="card" style="padding:12px;">
+      <strong>Create credited deposit</strong>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+        <input id="depUser" placeholder="user_id" style="flex:1;min-width:120px;">
+        <input id="depUsd" placeholder="usd e.g. 300.25" style="flex:1;min-width:180px;">
+        <button id="createDepBtn" type="button">Create</button>
+      </div>
+      <small>USD must end in .00 / .25 / .50 / .75</small>
+    </div>
+
+    <div class="card" style="padding:12px;">
+      <strong>Set team</strong>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+        <input id="teamUser" placeholder="user_id" style="flex:1;min-width:120px;">
+        <select id="teamVal" style="flex:1;min-width:180px;">
+          <option value="">(blank)</option>
+          <option value="patriots">patriots</option>
+          <option value="seahawks">seahawks</option>
+        </select>
+        <button id="setTeamBtn" type="button">Update</button>
+      </div>
+    </div>
+
+    <div class="card" style="padding:12px;">
+      <strong>Rebuild bets from credited deposits</strong>
+      <div style="margin-top:8px;">
+        <button id="rebuildBtn" type="button">Rebuild Bets</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(async function(){
+  const csrf = "<%= csrfToken %>";
+
+  async function jget(url){
+    const r = await fetch(url, { credentials: 'same-origin' });
+    return r.json();
+  }
+  async function jpost(url, body){
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type':'application/json', 'csrf-token': csrf },
+      credentials: 'same-origin',
+      body: JSON.stringify(body || {})
+    });
+    return r.json();
+  }
+
+  async function refresh(){
+    const ov = await jget('/admin/api/overview');
+    document.getElementById('overview').textContent =
+      ov.ok ? `Users: ${ov.users} | Deposits: ${ov.deposits} | Bets: ${ov.bets}` : 'Overview failed';
+
+    const users = await jget('/admin/api/users');
+    document.getElementById('users').textContent = JSON.stringify(users.users, null, 2);
+
+    const deps = await jget('/admin/api/deposits');
+    document.getElementById('deposits').textContent = JSON.stringify(deps.deposits, null, 2);
+  }
+
+  document.getElementById('createDepBtn').addEventListener('click', async () => {
+    const user_id = Number(document.getElementById('depUser').value);
+    const usd = document.getElementById('depUsd').value;
+    const r = await jpost('/admin/api/deposits/create', { user_id, usd });
+    if (!r.ok) alert(r.error || 'Failed');
+    await refresh();
+  });
+
+  document.getElementById('setTeamBtn').addEventListener('click', async () => {
+    const id = Number(document.getElementById('teamUser').value);
+    const team = document.getElementById('teamVal').value;
+    const r = await jpost(`/admin/api/users/${id}/team`, { team });
+    if (!r.ok) alert(r.error || 'Failed');
+    await refresh();
+  });
+
+  document.getElementById('rebuildBtn').addEventListener('click', async () => {
+    const r = await jpost('/admin/api/rebuild-bets', {});
+    if (!r.ok) alert('Failed');
+    await refresh();
+  });
+
+  await refresh();
+})();
+</script>
