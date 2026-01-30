@@ -1,0 +1,239 @@
+<hr>
+
+<h3>DB Browser (edit/create/delete)</h3>
+
+<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+  <label class="muted">Table</label>
+  <select id="dbTable"></select>
+
+  <label class="muted">Limit</label>
+  <input id="dbLimit" value="100" style="width:90px;">
+
+  <label class="muted">Offset</label>
+  <input id="dbOffset" value="0" style="width:90px;">
+
+  <button id="dbLoadBtn" type="button">Load</button>
+  <button id="dbAddRowBtn" type="button">Add row</button>
+</div>
+
+<div class="muted" id="dbMeta"></div>
+
+<div style="overflow:auto;border:1px solid rgba(255,255,255,.08);border-radius:10px;">
+  <table id="dbGrid" style="min-width:900px;width:100%;border-collapse:collapse;">
+    <thead id="dbHead"></thead>
+    <tbody id="dbBody"></tbody>
+  </table>
+</div>
+
+<p class="muted" style="margin-top:8px;">
+  Click any cell to edit, then press <strong>Enter</strong> to save. Press <strong>Esc</strong> to cancel.
+</p>
+
+<hr>
+
+<h3>Users (read-only dump)</h3>
+<pre id="users" style="white-space:pre-wrap;"></pre>
+
+<h3>Deposits (latest 200) (read-only dump)</h3>
+<pre id="deposits" style="white-space:pre-wrap;"></pre>
+<script>
+(async function(){
+  const csrf = "<%= csrfToken %>";
+
+  async function jget(url){
+    const r = await fetch(url, { credentials: 'same-origin' });
+    return r.json();
+  }
+  async function jpost(url, body){
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type':'application/json', 'csrf-token': csrf },
+      credentials: 'same-origin',
+      body: JSON.stringify(body || {})
+    });
+    return r.json();
+  }
+
+  // --------- Existing Overview + dumps ----------
+  async function refreshDumps(){
+    const ov = await jget('/admin/api/overview');
+    document.getElementById('overview').textContent =
+      ov.ok ? `Users: ${ov.users} | Deposits: ${ov.deposits} | Bets: ${ov.bets}` : 'Overview failed';
+
+    const users = await jget('/admin/api/users');
+    document.getElementById('users').textContent = JSON.stringify(users.users, null, 2);
+
+    const deps = await jget('/admin/api/deposits');
+    document.getElementById('deposits').textContent = JSON.stringify(deps.deposits, null, 2);
+  }
+
+  // --------- DB Browser ----------
+  const dbTableSel = document.getElementById('dbTable');
+  const dbLimitEl = document.getElementById('dbLimit');
+  const dbOffsetEl = document.getElementById('dbOffset');
+  const dbLoadBtn = document.getElementById('dbLoadBtn');
+  const dbAddRowBtn = document.getElementById('dbAddRowBtn');
+  const dbMeta = document.getElementById('dbMeta');
+  const dbHead = document.getElementById('dbHead');
+  const dbBody = document.getElementById('dbBody');
+
+  let current = { table: null, pk: null, cols: [] };
+
+  async function loadTables(){
+    const t = await jget('/admin/api/db/tables');
+    if (!t.ok) { alert(t.error || 'Failed to load tables'); return; }
+    dbTableSel.innerHTML = t.tables.map(n => `<option value="${n}">${n}</option>`).join('');
+    current.table = dbTableSel.value;
+  }
+
+  async function loadSchema(table){
+    const s = await jget(`/admin/api/db/${encodeURIComponent(table)}/schema`);
+    if (!s.ok) throw new Error(s.error || 'Schema failed');
+    current.pk = s.pk;
+    current.cols = (s.columns || []).map(c => c.name);
+    return s;
+  }
+
+  function renderGrid(rows){
+    dbHead.innerHTML = `<tr>${current.cols.map(c => `<th style="text-align:left;padding:8px;border-bottom:1px solid rgba(255,255,255,.08);">${c}</th>`).join('')}<th style="padding:8px;border-bottom:1px solid rgba(255,255,255,.08);">Actions</th></tr>`;
+
+    dbBody.innerHTML = rows.map(r => {
+      const pkv = r[current.pk];
+      return `<tr data-pk="${String(pkv)}">
+        ${current.cols.map(c => {
+          const v = (r[c] === null || r[c] === undefined) ? '' : String(r[c]);
+          return `<td data-col="${c}" style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">
+            <div class="cell" contenteditable="true" spellcheck="false"
+                 style="outline:none;white-space:pre;min-width:120px;"
+                 data-original="${encodeURIComponent(v)}">${escapeHtml(v)}</div>
+          </td>`;
+        }).join('')}
+        <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">
+          <button class="delRowBtn" type="button">Delete</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, (ch) => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[ch]));
+  }
+
+  async function loadRows(){
+    const table = dbTableSel.value;
+    const limit = Number(dbLimitEl.value || 100);
+    const offset = Number(dbOffsetEl.value || 0);
+
+    current.table = table;
+    const schema = await loadSchema(table);
+
+    const r = await jget(`/admin/api/db/${encodeURIComponent(table)}/rows?limit=${limit}&offset=${offset}`);
+    if (!r.ok) { alert(r.error || 'Failed to load rows'); return; }
+
+    dbMeta.textContent = `Table: ${table} | PK: ${schema.pk || 'none'} | Rows shown: ${r.rows.length} | limit=${r.limit} offset=${r.offset}`;
+    renderGrid(r.rows);
+  }
+
+  // Save on Enter, cancel on Esc
+  dbBody.addEventListener('keydown', async (ev) => {
+    const cell = ev.target.closest('.cell');
+    if (!cell) return;
+
+    if (ev.key === 'Escape') {
+      ev.preventDefault();
+      const orig = decodeURIComponent(cell.getAttribute('data-original') || '');
+      cell.textContent = orig;
+      cell.blur();
+      return;
+    }
+
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      const tr = cell.closest('tr');
+      const pkValue = tr.getAttribute('data-pk');
+      const td = cell.closest('td');
+      const col = td.getAttribute('data-col');
+      const newVal = cell.textContent;
+
+      const patch = {};
+      patch[col] = newVal;
+
+      const resp = await jpost(`/admin/api/db/${encodeURIComponent(current.table)}/update`, { pkValue, patch });
+      if (!resp.ok) {
+        alert(resp.error || 'Update failed');
+        return;
+      }
+
+      cell.setAttribute('data-original', encodeURIComponent(newVal));
+      cell.blur();
+    }
+  });
+
+  // Delete row
+  dbBody.addEventListener('click', async (ev) => {
+    const btn = ev.target.closest('.delRowBtn');
+    if (!btn) return;
+    const tr = btn.closest('tr');
+    const pkValue = tr.getAttribute('data-pk');
+    if (!confirm(`Delete row ${current.pk}=${pkValue} from ${current.table}?`)) return;
+
+    const resp = await jpost(`/admin/api/db/${encodeURIComponent(current.table)}/delete`, { pkValue });
+    if (!resp.ok) { alert(resp.error || 'Delete failed'); return; }
+    tr.remove();
+  });
+
+  // Add row prompt (simple)
+  dbAddRowBtn.addEventListener('click', async () => {
+    const table = dbTableSel.value;
+    await loadSchema(table);
+
+    const row = {};
+    for (const c of current.cols) {
+      if (c === current.pk) continue;
+      const v = prompt(`Value for ${c} (blank = empty string)`);
+      if (v === null) return; // cancel
+      row[c] = v;
+    }
+
+    const resp = await jpost(`/admin/api/db/${encodeURIComponent(table)}/insert`, { row });
+    if (!resp.ok) { alert(resp.error || 'Insert failed'); return; }
+    await loadRows();
+  });
+
+  dbLoadBtn.addEventListener('click', loadRows);
+  dbTableSel.addEventListener('change', loadRows);
+
+  // Keep your existing actions
+  document.getElementById('createDepBtn')?.addEventListener('click', async () => {
+    const user_id = Number(document.getElementById('depUser').value);
+    const usd = document.getElementById('depUsd').value;
+    const r = await jpost('/admin/api/deposits/create', { user_id, usd });
+    if (!r.ok) alert(r.error || 'Failed');
+    await refreshDumps();
+    await loadRows();
+  });
+
+  document.getElementById('setTeamBtn')?.addEventListener('click', async () => {
+    const id = Number(document.getElementById('teamUser').value);
+    const team = document.getElementById('teamVal').value;
+    const r = await jpost(`/admin/api/users/${id}/team`, { team });
+    if (!r.ok) alert(r.error || 'Failed');
+    await refreshDumps();
+    await loadRows();
+  });
+
+  document.getElementById('rebuildBtn')?.addEventListener('click', async () => {
+    const r = await jpost('/admin/api/rebuild-bets', {});
+    if (!r.ok) alert('Failed');
+    await refreshDumps();
+    await loadRows();
+  });
+
+  // init
+  await refreshDumps();
+  await loadTables();
+  await loadRows();
+})();
+</script>
